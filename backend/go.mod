@@ -1,4 +1,4 @@
-module fsa-boilerplate/backend
+module fsa-llm-experiments/backend
 
 go 1.25
 

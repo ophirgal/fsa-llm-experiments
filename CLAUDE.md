@@ -1,6 +1,6 @@
 # Project Context
 
-This is a full-stack web application built for a coding interview. The goal is to implement the required features as quickly and cleanly as possible.
+This is a full-stack LLM evaluation tool. Users upload query datasets, define experiments with system prompt variants and a judge prompt, run those experiments against an LLM, and view pass-rate results per variant.
 
 ## Stack
 
@@ -25,16 +25,6 @@ make clean             # stop + wipe volumes
 ```
 
 App is at **http://localhost:3000**. API is at **http://localhost:3000/api/v1/**.
-
-## Architecture
-
-```
-Browser → nginx:80 (host: 3000)
-              ├── /api/v1/*  → backend:8080
-              └── /*         → frontend:5173 (dev) / static files (prod)
-```
-
-Both backend (Air) and frontend (Vite) hot-reload on file save. No container restarts needed during development.
 
 ## Key Files
 
@@ -138,9 +128,9 @@ Create `frontend/src/pages/ItemsPage.tsx` and add it to the router in `App.tsx`.
 
 ## Go Module
 
-Module name: `fsa-boilerplate/backend`
+Module name: `fsa-llm-experiments/backend`
 
-Import paths follow `fsa-boilerplate/backend/<package>` (e.g., `fsa-boilerplate/backend/api`, `fsa-boilerplate/backend/dal`, `fsa-boilerplate/backend/config`).
+Import paths follow `fsa-llm-experiments/backend/<package>` (e.g., `fsa-llm-experiments/backend/api`, `fsa-llm-experiments/backend/dal`, `fsa-llm-experiments/backend/config`).
 
 ## Tailwind & shadcn/ui
 

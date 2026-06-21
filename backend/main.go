@@ -3,9 +3,9 @@ package main
 import (
 	"log"
 
-	"fsa-boilerplate/backend/api"
-	"fsa-boilerplate/backend/config"
-	"fsa-boilerplate/backend/dal"
+	"fsa-llm-experiments/backend/api"
+	"fsa-llm-experiments/backend/config"
+	"fsa-llm-experiments/backend/dal"
 )
 
 func main() {

@@ -1,8 +1,17 @@
-# FSA Boilerplate
+# LLM Experiment Runner
 
-Full-stack application boilerplate for AI-assisted coding interviews (60–90 min).
+A tool for evaluating LLM system prompt variants against a dataset of queries using an LLM-as-judge scoring approach.
 
 **Stack:** Go + Gin · React + TypeScript + TailwindCSS + shadcn/ui + Axios + React Query · PostgreSQL · Nginx · Docker Compose
+
+---
+
+## What It Does
+
+1. **Upload a dataset** — upload a plain text file where each line is a query
+2. **Create an experiment** — pick a dataset, write one or more system prompt variants, and write a shared judge prompt
+3. **Run the experiment** — each query is sent to the LLM once per variant; every response is then scored automatically by the judge prompt (1 = pass, 0 = fail)
+4. **View results** — see a per-variant pass rate: how many queries scored 1 out of the total
 
 ---
 
@@ -56,7 +65,7 @@ Both the backend (Air) and frontend (Vite) support hot reload — file saves are
 ## Project Structure
 
 ```
-fsa-boilerplate/
+fsa-llm-experiments/
 ├── backend/
 │   ├── api/             # HTTP handlers and router (/api/v1 routes)
 │   ├── dal/             # data access layer (DB connection, migrations)
@@ -80,7 +89,7 @@ fsa-boilerplate/
 
 ## Adding a New Resource
 
-**1. Migration** — `backend/migrations/002_<name>.sql`
+**1. Migration** — `backend/migrations/NNN_<name>.sql`
 ```sql
 CREATE TABLE IF NOT EXISTS items (
     id         BIGSERIAL PRIMARY KEY,
@@ -115,9 +124,20 @@ export function useItems() {
 
 ---
 
+## Core Domain
+
+| Entity | Description |
+|---|---|
+| **Dataset** | A named collection of queries parsed from an uploaded text file (one query per line) |
+| **Experiment** | Ties a dataset to one or more system prompt variants and a shared judge prompt |
+| **Run** | One execution of an experiment — sends each query through the LLM for each variant |
+| **Result** | The LLM response + judge score (1/0) for a single query × variant pair |
+
+---
+
 ## shadcn/ui
 
-UI components live in `frontend/src/components/ui/`. A `Button` component is included as a starter. Add more from the shadcn registry:
+UI components live in `frontend/src/components/ui/`. Add more from the shadcn registry:
 
 ```bash
 cd frontend
@@ -126,30 +146,15 @@ npx shadcn@latest add input
 npx shadcn@latest add dialog
 ```
 
-Import components using the `@` alias:
+Import with the `@` alias:
 
 ```tsx
 import { Button } from '@/components/ui/button'
-
-<Button variant="outline">Click me</Button>
 ```
 
-Use `cn()` to merge Tailwind classes conditionally:
+Use `cn()` to merge Tailwind classes:
 
 ```tsx
 import { cn } from '@/lib/utils'
-
 <div className={cn('p-4', isActive && 'bg-primary text-primary-foreground')} />
 ```
-
-Theme tokens (`bg-primary`, `text-muted-foreground`, etc.) are defined as CSS variables in `src/index.css` and mapped in `tailwind.config.js`.
-
----
-
-## Production
-
-```bash
-make build-prod   # builds static frontend, runs backend binary
-```
-
-In production, Nginx serves the compiled React assets from `dist/` and proxies `/api/v1/*` to the Go backend. No Vite or Node process runs.
