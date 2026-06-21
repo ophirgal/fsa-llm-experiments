@@ -36,6 +36,25 @@ func ListDatasets(ctx context.Context, db *sql.DB) ([]Dataset, error) {
 	return datasets, rows.Err()
 }
 
+func ListQueries(ctx context.Context, db *sql.DB, datasetID int64) ([]string, error) {
+	rows, err := db.QueryContext(ctx,
+		`SELECT query FROM user_queries WHERE dataset_id = $1 ORDER BY id`, datasetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var queries []string
+	for rows.Next() {
+		var q string
+		if err := rows.Scan(&q); err != nil {
+			return nil, err
+		}
+		queries = append(queries, q)
+	}
+	return queries, rows.Err()
+}
+
 func CreateDataset(ctx context.Context, db *sql.DB, name string, queries []string) (DatasetCreated, error) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {

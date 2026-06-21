@@ -2,12 +2,15 @@ package api
 
 import (
 	"bytes"
+	"crypto/rand"
 	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"strings"
 	"testing"
@@ -22,11 +25,39 @@ func setupTestDB(t *testing.T) *sql.DB {
 	if dsn == "" {
 		t.Skip("TEST_DATABASE_URL not set")
 	}
-	db, err := sql.Open("pgx", dsn)
+
+	b := make([]byte, 8)
+	rand.Read(b)
+	schema := "test_" + hex.EncodeToString(b)
+
+	base, err := sql.Open("pgx", dsn)
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	if _, err = base.Exec("CREATE SCHEMA " + schema); err != nil {
+		base.Close()
+		t.Fatalf("create schema: %v", err)
+	}
+	base.Close()
+
+	u, err := url.Parse(dsn)
+	if err != nil {
+		t.Fatalf("parse dsn: %v", err)
+	}
+	q := u.Query()
+	q.Set("options", fmt.Sprintf("-c search_path=%s", schema))
+	u.RawQuery = q.Encode()
+
+	db, err := sql.Open("pgx", u.String())
+	if err != nil {
+		t.Fatalf("open schema db: %v", err)
+	}
+	t.Cleanup(func() {
+		db.Close()
+		drop, _ := sql.Open("pgx", dsn)
+		drop.Exec("DROP SCHEMA " + schema + " CASCADE")
+		drop.Close()
+	})
 
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS datasets (
@@ -40,14 +71,33 @@ func setupTestDB(t *testing.T) *sql.DB {
 			query TEXT NOT NULL,
 			created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 		);
+		CREATE TYPE experiment_status AS ENUM ('ready', 'in progress', 'done', 'failed');
+		CREATE TABLE IF NOT EXISTS experiments (
+			id          BIGSERIAL PRIMARY KEY,
+			name        TEXT               NOT NULL,
+			dataset_id  BIGINT             NOT NULL REFERENCES datasets(id) ON DELETE RESTRICT,
+			status      experiment_status  NOT NULL DEFAULT 'ready',
+			total_score DOUBLE PRECISION,
+			start_time  TIMESTAMPTZ,
+			end_time    TIMESTAMPTZ,
+			created_at  TIMESTAMPTZ        NOT NULL DEFAULT NOW()
+		);
+		CREATE TABLE IF NOT EXISTS experiment_prompts (
+			id            BIGSERIAL PRIMARY KEY,
+			experiment_id BIGINT      NOT NULL REFERENCES experiments(id) ON DELETE CASCADE,
+			prompt        TEXT        NOT NULL,
+			created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
+		CREATE TABLE IF NOT EXISTS experiment_judge_prompt (
+			id            BIGSERIAL PRIMARY KEY,
+			experiment_id BIGINT      NOT NULL REFERENCES experiments(id) ON DELETE CASCADE,
+			prompt        TEXT        NOT NULL,
+			created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+		);
 	`)
 	if err != nil {
 		t.Fatalf("create tables: %v", err)
 	}
-	t.Cleanup(func() {
-		db.Exec(`DELETE FROM user_queries`)
-		db.Exec(`DELETE FROM datasets`)
-	})
 	return db
 }
 
