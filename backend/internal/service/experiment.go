@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -89,39 +90,72 @@ func RunExperiment(ctx context.Context, db *sql.DB, experimentID int64, chat Cha
 		chat = OllamaChat
 	}
 
+	log := slog.With("experiment_id", experimentID)
+	log.Info("experiment started")
+
 	exp, err := dal.GetExperiment(ctx, db, experimentID)
 	if err != nil {
+		log.Error("failed to load experiment", "error", err)
 		dal.FinishExperiment(ctx, db, experimentID, 0, true)
 		return err
 	}
 
 	queries, err := dal.ListQueries(ctx, db, exp.DatasetID)
 	if err != nil {
+		log.Error("failed to load queries", "dataset_id", exp.DatasetID, "error", err)
 		dal.FinishExperiment(ctx, db, experimentID, 0, true)
 		return err
 	}
 
 	total := len(exp.Prompts) * len(queries)
 	var passes int
+	completed := 0
 
-	for _, prompt := range exp.Prompts {
-		for _, query := range queries {
+	log.Info("experiment running", "variants", len(exp.Prompts), "queries", len(queries), "total_pairs", total)
+
+	for variantIdx, prompt := range exp.Prompts {
+		for queryIdx, query := range queries {
+			completed++
+			log.Info("calling model",
+				"variant", variantIdx+1,
+				"query", queryIdx+1,
+				"progress", fmt.Sprintf("%d/%d", completed, total),
+				"system_prompt", prompt,
+				"user_msg", query,
+			)
+
 			modelResponse, err := chat(ctx, prompt, query)
 			if err != nil {
+				log.Error("model call failed", "variant", variantIdx+1, "query", queryIdx+1, "error", err)
 				dal.FinishExperiment(ctx, db, experimentID, 0, true)
 				return err
 			}
 
 			judgeInput := fmt.Sprintf("Query: %s\n\nResponse: %s", query, modelResponse)
+			log.Info("calling judge",
+				"variant", variantIdx+1,
+				"query", queryIdx+1,
+				"system_prompt", exp.JudgePrompt,
+				"user_msg", judgeInput,
+			)
+
 			verdict, err := chat(ctx, exp.JudgePrompt, judgeInput)
 			if err != nil {
+				log.Error("judge call failed", "variant", variantIdx+1, "query", queryIdx+1, "error", err)
 				dal.FinishExperiment(ctx, db, experimentID, 0, true)
 				return err
 			}
 
-			if strings.Contains(strings.ToUpper(verdict), "PASS") {
+			pass := strings.Contains(strings.ToUpper(verdict), "PASS")
+			if pass {
 				passes++
 			}
+			log.Info("query judged",
+				"variant", variantIdx+1,
+				"query", queryIdx+1,
+				"result", map[bool]string{true: "PASS", false: "FAIL"}[pass],
+				"passes_so_far", passes,
+			)
 		}
 	}
 
@@ -130,5 +164,6 @@ func RunExperiment(ctx context.Context, db *sql.DB, experimentID int64, chat Cha
 		score = float64(passes) / float64(total) * 100
 	}
 
+	log.Info("experiment finished", "passes", passes, "total", total, "score", fmt.Sprintf("%.1f%%", score))
 	return dal.FinishExperiment(ctx, db, experimentID, score, false)
 }
