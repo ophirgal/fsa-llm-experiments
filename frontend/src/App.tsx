@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom'
 import { SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { AppSidebar } from '@/components/AppSidebar'
@@ -5,8 +6,11 @@ import DatasetsPage from '@/pages/DatasetsPage'
 import ExperimentsPage from '@/pages/ExperimentsPage'
 import NotFoundPage from '@/pages/NotFoundPage'
 
+const queryClient = new QueryClient()
+
 export default function App() {
   return (
+    <QueryClientProvider client={queryClient}>
     <BrowserRouter>
       <SidebarProvider>
         <AppSidebar />
@@ -21,5 +25,6 @@ export default function App() {
         </main>
       </SidebarProvider>
     </BrowserRouter>
+    </QueryClientProvider>
   )
 }

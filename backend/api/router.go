@@ -12,7 +12,8 @@ func New(db *sql.DB) *gin.Engine {
 	v1 := r.Group("/api/v1")
 	{
 		v1.GET("/health", Health)
-		// Add routes here
+		v1.GET("/datasets", ListDatasets(db))
+		v1.POST("/datasets", CreateDataset(db))
 	}
 
 	return r
